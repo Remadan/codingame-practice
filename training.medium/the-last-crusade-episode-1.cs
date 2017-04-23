@@ -16,17 +16,18 @@ class Player
 
         Dictionary<int, RoomLayout> roomTypes = DefaultRoomTypes();
 
-
-
-
-
         string[] inputs;
         inputs = Console.ReadLine().Split(' ');
         int dungeonWidth = int.Parse(inputs[0]); // number of columns.
         int dungeonHeight = int.Parse(inputs[1]); // number of rows.
+        int[,] dungeonMap = new int[dungeonWidth, dungeonHeight];
         for (int i = 0; i < dungeonHeight; i++)
         {
-            string LINE = Console.ReadLine(); // represents a line in the grid and contains W integers. Each integer represents one room of a given type.
+            string[] LINE = Console.ReadLine().Split(' '); // represents a line in the grid and contains W integers. Each integer represents one room of a given type.
+            for (int j = 0; j < dungeonWidth; j++)
+            {
+                dungeonMap[j, i] = int.Parse(LINE[j]);
+            }
         }
         int EX = int.Parse(Console.ReadLine()); // the coordinate along the X axis of the exit (not useful for this first mission, but must be read).
 
@@ -38,17 +39,35 @@ class Player
             int YI = int.Parse(inputs[1]);
             string POS = inputs[2];
 
-            // To debug: Console.Error.WriteLine("Debug messages...");
+            RoomLayout currentRoom = roomTypes[dungeonMap[XI, YI]];
+            List<int> newDirections = currentRoom.AvailableExits(POS);
 
+            if (newDirections.Count == 1)
+            {
+                switch (newDirections[0])
+                {
+                    case 0:
+                        YI -= 1;
+                        break;
+                    case 1:
+                        XI += 1;
+                        break;
+                    case 2:
+                        YI += 1;
+                        break;
+                    case 3:
+                        XI -= 1;
+                        break;
+                }
+            }
 
-            // One line containing the X Y coordinates of the room in which you believe Indy will be on the next turn.
-            Console.WriteLine("0 0");
+            Console.WriteLine("" + XI + " " + YI);
         }
     }
 
     static Dictionary<int, RoomLayout> DefaultRoomTypes()
     {
-        // UP       - 0
+        // TOP      - 0
         // RIGHT    - 1
         // BOTTOM   - 2
         // LEFT     - 3
@@ -100,10 +119,17 @@ class Player
 class RoomLayout
 {
     private Dictionary<int, List<int>> entryPoints;
+    private Dictionary<string, int> directions;
 
     public RoomLayout()
     {
         entryPoints = new Dictionary<int, List<int>>();
+
+        directions = new Dictionary<string, int>();
+        directions.Add("TOP", 0);
+        directions.Add("RIGHT", 1);
+        directions.Add("BOTTOM", 2);
+        directions.Add("LEFT", 3);
     }
 
     public List<int> AvailableExits(int entryPoint)
@@ -114,6 +140,11 @@ class RoomLayout
             result = null;
         }
         return result;
+    }
+
+    public List<int> AvailableExits(string entryPoint)
+    {
+        return AvailableExits(directions[entryPoint]);
     }
 
     public void AddEntryPoint(int entryPoint, List<int> exits)
