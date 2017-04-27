@@ -39,8 +39,8 @@ class Player
             int YI = int.Parse(inputs[1]);
             string POS = inputs[2];
 
-            RoomLayout currentRoom = roomTypes[dungeonMap[XI, YI]];
-            List<int> newDirections = currentRoom.AvailableExits(POS);
+            RoomLayout currentRoomType = roomTypes[dungeonMap[XI, YI]];
+            List<int> newDirections = currentRoomType.AvailableExits(POS);
 
             if (newDirections.Count == 1)
             {
