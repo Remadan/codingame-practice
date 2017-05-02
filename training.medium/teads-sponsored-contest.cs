@@ -15,7 +15,6 @@ class Solution
     {
         // populating network
         Graph<int> adNetwork = new Graph<int>();
-        Dictionary<int, GraphNode<int>> nodesMap = new Dictionary<int, GraphNode<int>>();
         int n = int.Parse(Console.ReadLine()); // the number of adjacency relations
         for (int i = 0; i < n; i++)
         {
