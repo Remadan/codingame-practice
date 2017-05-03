@@ -13,6 +13,7 @@ class Solution
 {
     static void Main(string[] args)
     {
+        Dictionary<GraphNode<int>, int> influenceCache = new Dictionary<GraphNode<int>, int>();
         // populating network
         Graph<int> peopleNetwork = new Graph<int>();
         int n = int.Parse(Console.ReadLine()); // the number of relationships of influence
@@ -22,19 +23,38 @@ class Solution
             int x = int.Parse(inputs[0]); // a relationship of influence between two people (x influences y)
             int y = int.Parse(inputs[1]);
 
-            nodeX = peopleNetwork.AddNode(x);
-            nodeY = peopleNetwork.AddNode(y);
+            GraphNode<int> nodeX = peopleNetwork.AddNode(x);
+            GraphNode<int> nodeY = peopleNetwork.AddNode(y);
 
             peopleNetwork.AddDirectedEdge(nodeX, nodeY);
         }
 
-        // Write an action using Console.WriteLine()
+        int maxInfluence = int.MinValue;
+        foreach (GraphNode<int> currentNode in peopleNetwork.Nodes)
+        {
+            int nodeInfluence = CalculateInfluence(currentNode, influenceCache);
+            if (maxInfluence < nodeInfluence)
+                maxInfluence = nodeInfluence;
+        }
         // To debug: Console.Error.WriteLine("Debug messages...");
-
-
-        // The number of people involved in the longest succession of influences
-        Console.WriteLine("2");
+        Console.WriteLine(maxInfluence);
     }
+
+    static int CalculateInfluence(GraphNode<int> currentNode, Dictionary<GraphNode<int>, int> influenceCache)
+    {
+        int nodeInfluence;
+        if (!influenceCache.TryGetValue(currentNode, out nodeInfluence))
+        {
+            nodeInfluence = currentNode.NeighborsOut.Count;
+            foreach (GraphNode<int> childNode in currentNode.NeighborsOut)
+            {
+                nodeInfluence += CalculateInfluence(childNode, influenceCache);
+            }
+            influenceCache.Add(currentNode, nodeInfluence);
+        }
+        return nodeInfluence;
+    }
+
 }
 
 public class Graph<T>
@@ -70,8 +90,8 @@ public class Graph<T>
 
     public void AddDirectedEdge(T from, T to)
     {
-        GraphNode<T> nodeFrom = nodeSet.FindByValue(from);
-        GraphNode<T> nodeTo = nodeSet.FindByValue(to);
+        GraphNode<T> nodeFrom = Nodes.FindByValue(from);
+        GraphNode<T> nodeTo = Nodes.FindByValue(to);
         if (nodeFrom != null & nodeTo != null)
             AddDirectedEdge(nodeFrom, nodeTo);
     }
