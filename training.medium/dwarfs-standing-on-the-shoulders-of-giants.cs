@@ -33,8 +33,7 @@ class Solution
         foreach (GraphNode<int> currentNode in peopleNetwork.Nodes)
         {
             int nodeInfluence = CalculateInfluence(currentNode, influenceCache);
-            if (maxInfluence < nodeInfluence)
-                maxInfluence = nodeInfluence;
+            maxInfluence = Math.Max(maxInfluence, nodeInfluence);
         }
         // To debug: Console.Error.WriteLine("Debug messages...");
         Console.WriteLine(maxInfluence);
@@ -45,16 +44,16 @@ class Solution
         int nodeInfluence;
         if (!influenceCache.TryGetValue(currentNode, out nodeInfluence))
         {
-            nodeInfluence = currentNode.NeighborsOut.Count;
+            int maxChildInfluence = 0;
             foreach (GraphNode<int> childNode in currentNode.NeighborsOut)
             {
-                nodeInfluence += CalculateInfluence(childNode, influenceCache);
+                maxChildInfluence = Math.Max(maxChildInfluence, CalculateInfluence(childNode, influenceCache));
             }
+            nodeInfluence = 1 + maxChildInfluence;
             influenceCache.Add(currentNode, nodeInfluence);
         }
         return nodeInfluence;
     }
-
 }
 
 public class Graph<T>
