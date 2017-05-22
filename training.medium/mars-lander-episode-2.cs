@@ -27,14 +27,23 @@ class Player
 
             marsMap.AddPoint(landX, landY);
         }
-        Console.Error.WriteLine(marsMap.LandingZoneStart);
-        Console.Error.WriteLine(marsMap.LandingZoneEnd);
+        //Console.Error.WriteLine(marsMap.LandingZoneStart);
+        //Console.Error.WriteLine(marsMap.LandingZoneEnd);
 
-        // horizontal move - accelerating, cruise speed, decelerating 
-        // vertical move - free fall, decelerating, land
+        // desired horizontal speed 
+        int horizontalMaxSpeed = 50; 
+        int horizontalCruiseSpeed = 40; // for getting above landing zone
+        int horizontalLandingSpeed = 17; // for landing
+
+        // desired vertical speed 
+        int verticalMaxSpeed = 15; // for getting above landing zone
+        int verticalLandingSpeed = 38; // for landing
+
+        int safeHeightAboveGround = 200; // we shouldn't go lower unless touching down
 
         // A = acos(3.711 / 4) = acos(0.9275) = 21.9 from https://forum.codingame.com/t/mars-lander-puzzle-discussion/32/14
-        int horizontalMoveDefaultAngle = 21; 
+        int horizontalMoveDefaultAngle = 20;
+        int horizontalEmergencyBrakeAngle = 45;
 
         // game loop
         while (true)
@@ -52,55 +61,66 @@ class Player
             int power = int.Parse(inputs[6]); // the thrust power (0 to 4).
 
             Position currentPosition = new Position(X, Y);
-            if (marsMap.AboveLandingZone(currentPosition))
+            Direction cruiseDirection = marsMap.GetDirectionToLandingZone(currentPosition);
+            Position nextPeak = marsMap.GetNextPeak(currentPosition, cruiseDirection);
+
+            int directionalSpeed = hSpeed * (int)cruiseDirection;
+            int directionalAngle = rotate * -(int)cruiseDirection;
+
+            bool aboveLandingZone = marsMap.AboveLandingZone(currentPosition);
+
+            int currentHorizLimit = aboveLandingZone ? horizontalLandingSpeed : horizontalMaxSpeed;
+            int currentVertLimit = aboveLandingZone ? verticalLandingSpeed : verticalMaxSpeed;
+
+            bool touchMode = aboveLandingZone && marsMap.HeightAboveLanding(currentPosition) < safeHeightAboveGround && directionalSpeed <= currentHorizLimit;
+            bool dungerousHeight = (currentPosition.Height - nextPeak.Height < safeHeightAboveGround);
+
+
+            Console.Error.WriteLine("directionalSpeed: " + directionalSpeed);
+            Console.Error.WriteLine("cruiseDirection: " + cruiseDirection);
+            Console.Error.WriteLine("directionalAngle: " + directionalAngle);
+            Console.Error.WriteLine("dungerousHeight: " + dungerousHeight);
+
+            if (touchMode)
             {
-                // vertical move
-
-                // do we need to stop?
-                if (Math.Abs(hSpeed) > 10)
-                {
-                    newAngle = 90 * ((hSpeed > 0) ? 1 : -1);
-                    newPower = 4;
-                }
-                else
-                {
-                    newAngle = 0;
-
-                    newPower = 500;
-
-                    if (marsMap.HeightAboveLanding(currentPosition) > 200)
-                    {
-                        newPower = 0;
-                    }
-                    else
-                    {
-                        newPower = 4;
-                    }
-                }
-
+                newAngle = 0;
+                newPower = (-vSpeed > currentVertLimit) ? 4: 3;
+                Console.Error.WriteLine("Current mode: TOUCH");
             }
-            else
+            else if (-vSpeed > currentVertLimit || dungerousHeight) // need to get UP
             {
-                // horizontal move
-                int cruiseDirection = (marsMap.LandingZoneStart.Longitude < currentPosition.Longitude) ? 1 : -1; // 1 - west, -1 - east
-
-                // how fast are we going?
-                if (hSpeed> 60) // to fast
-                {
-
-                }
-
-                // which direction?
-                newAngle = horizontalMoveDefaultAngle * cruiseDirection;
-
-
+                newAngle = 0;
                 newPower = 4;
-
-
-
-
+                Console.Error.WriteLine("Current mode: UP");
             }
+            else if (directionalSpeed < 0 || directionalSpeed > currentHorizLimit) // emergency brake
+            {
+                bool highPriorityBrake = directionalSpeed < 0 || directionalSpeed > horizontalMaxSpeed;
+                newAngle = horizontalEmergencyBrakeAngle * (int)cruiseDirection * (directionalSpeed < 0 ? -1 : 1) / (highPriorityBrake ? 1 : 2);
 
+                if (directionalAngle > 60)
+                    newPower = 0; // we really don't need more speed
+                else
+                    newPower = 4;
+
+                Console.Error.WriteLine("Current mode: BRAKE");
+            }
+            else if (!aboveLandingZone && directionalSpeed < horizontalCruiseSpeed) // cruising to landing zone
+            {
+                newAngle = horizontalMoveDefaultAngle * -(int)cruiseDirection / (dungerousHeight ? 2 : 1);
+                newPower = 4;
+                Console.Error.WriteLine("Current mode: CRUISE");
+            }
+            else // above landing with a height to spare or in cruise
+            {
+                newAngle = 0;
+                if (Math.Abs(rotate) < 45)
+                    newPower = 3;
+                else
+                    newPower = 0;
+
+                Console.Error.WriteLine("Current mode: DESCENT");
+            }
 
             // rotate power. rotate is the desired rotation angle. power is the desired thrust power.
             // To debug: Console.Error.WriteLine("Debug messages...");
@@ -108,6 +128,13 @@ class Player
         }
     }
 }
+
+enum Direction
+{
+    WEST = -1,
+    EAST = 1
+}
+
 
 struct Position
 {
@@ -162,6 +189,36 @@ class MarsMap
     public bool AboveLandingZone(Position currentPosition)
     {
         return (currentPosition.Longitude >= LandingZoneStart.Longitude && currentPosition.Longitude <= LandingZoneEnd.Longitude);
+    }
+
+    public Position GetNextPeak(Position currentPosition, Direction cruiseDirection)
+    {
+        Position maxHeightPeak = new Position(0, 0);
+
+        if (AboveLandingZone(currentPosition))
+            return maxHeightPeak;
+
+        foreach (Position point in Points)
+        {
+            if ((cruiseDirection == Direction.EAST && (point.Longitude < currentPosition.Longitude || point.Longitude > LandingZoneEnd.Longitude)) 
+                || (cruiseDirection == Direction.WEST && (point.Longitude > currentPosition.Longitude || point.Longitude < LandingZoneStart.Longitude)))
+                continue;
+
+            if (point.Height > maxHeightPeak.Height)
+                maxHeightPeak = point;
+        }
+
+        return maxHeightPeak;
+    }
+
+    public Direction GetDirectionToLandingZone(Position currentPosition)
+    {
+        int landingLongitude = (LandingZoneStart.Longitude + LandingZoneEnd.Longitude) / 2;
+
+        if (currentPosition.Longitude < landingLongitude)
+            return Direction.EAST;
+        else
+            return Direction.WEST;
     }
 
     public int HeightAboveLanding(Position currentPosition)
