@@ -15,8 +15,6 @@ class Player
     {
         MarsMap marsMap = new MarsMap();
 
-        const double marsGravity = -3.711;
-
         string[] inputs;
         int surfaceN = int.Parse(Console.ReadLine()); // the number of points used to draw the surface of Mars.
         for (int i = 0; i < surfaceN; i++)
@@ -27,21 +25,18 @@ class Player
 
             marsMap.AddPoint(landX, landY);
         }
-        //Console.Error.WriteLine(marsMap.LandingZoneStart);
-        //Console.Error.WriteLine(marsMap.LandingZoneEnd);
 
         // desired horizontal speed 
-        int horizontalMaxSpeed = 50; 
+        int horizontalMaxSpeed = 60; 
         int horizontalCruiseSpeed = 40; // for getting above landing zone
-        int horizontalLandingSpeed = 17; // for landing
+        int horizontalLandingSpeed = 19; // for landing
 
         // desired vertical speed 
-        int verticalMaxSpeed = 15; // for getting above landing zone
+        int verticalMaxSpeed = 10; // for getting above landing zone
         int verticalLandingSpeed = 38; // for landing
 
         int safeHeightAboveGround = 200; // we shouldn't go lower unless touching down
 
-        // A = acos(3.711 / 4) = acos(0.9275) = 21.9 from https://forum.codingame.com/t/mars-lander-puzzle-discussion/32/14
         int horizontalMoveDefaultAngle = 20;
         int horizontalEmergencyBrakeAngle = 45;
 
@@ -75,7 +70,6 @@ class Player
             bool touchMode = aboveLandingZone && marsMap.HeightAboveLanding(currentPosition) < safeHeightAboveGround && directionalSpeed <= currentHorizLimit;
             bool dungerousHeight = (currentPosition.Height - nextPeak.Height < safeHeightAboveGround);
 
-
             Console.Error.WriteLine("directionalSpeed: " + directionalSpeed);
             Console.Error.WriteLine("cruiseDirection: " + cruiseDirection);
             Console.Error.WriteLine("directionalAngle: " + directionalAngle);
@@ -87,11 +81,11 @@ class Player
                 newPower = (-vSpeed > currentVertLimit) ? 4: 3;
                 Console.Error.WriteLine("Current mode: TOUCH");
             }
-            else if (-vSpeed > currentVertLimit || dungerousHeight) // need to get UP
+            else if (dungerousHeight) // need to get UP
             {
                 newAngle = 0;
                 newPower = 4;
-                Console.Error.WriteLine("Current mode: UP");
+                Console.Error.WriteLine("Current mode: UP - Height");
             }
             else if (directionalSpeed < 0 || directionalSpeed > currentHorizLimit) // emergency brake
             {
@@ -105,6 +99,12 @@ class Player
 
                 Console.Error.WriteLine("Current mode: BRAKE");
             }
+            else if (-vSpeed > currentVertLimit) // need to get UP
+            {
+                newAngle = 0;
+                newPower = 4;
+                Console.Error.WriteLine("Current mode: UP - vert speed");
+            }
             else if (!aboveLandingZone && directionalSpeed < horizontalCruiseSpeed) // cruising to landing zone
             {
                 newAngle = horizontalMoveDefaultAngle * -(int)cruiseDirection / (dungerousHeight ? 2 : 1);
@@ -115,7 +115,7 @@ class Player
             {
                 newAngle = 0;
                 if (Math.Abs(rotate) < 45)
-                    newPower = 3;
+                    newPower = 2;
                 else
                     newPower = 0;
 
