@@ -5,10 +5,6 @@ using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 
-/**
- * Auto-generated code below aims at helping you parse
- * the standard input according to the problem statement.
- **/
 class Player
 {
     static void Main(string[] args)
@@ -19,68 +15,292 @@ class Player
         int mazeColumns = int.Parse(inputs[1]); // number of columns.
         int alarmRounds = int.Parse(inputs[2]); // number of rounds between the time the alarm countdown is activated and the time the alarm goes off.
 
-        Graph <MazeTile> mazeGraph = new Graph<MazeTile>();
+        bool alarmTriggered = false;
+        KirkMaze KirkMaze = new KirkMaze(mazeRows, mazeColumns);
 
         // game loop
         while (true)
         {
+            string newMove;
+
+            // where are we ?
             inputs = Console.ReadLine().Split(' ');
-            int currentRow = int.Parse(inputs[0]); // row where Kirk is located.
-            int currentColumns = int.Parse(inputs[1]); // column where Kirk is located.
+            Position currentPosition = new Position(int.Parse(inputs[0]), int.Parse(inputs[1]));
+            
+            // are we screwed?
+            if (!alarmTriggered && currentPosition == KirkMaze.ControlRoomPosition)
+            {
+                alarmTriggered = true;
+            }
+
+            // updating maze tiles
             for (int i = 0; i < mazeRows; i++)
             {
                 string inputRow = Console.ReadLine(); // C of the characters in '#.TC?' (i.e. one line of the ASCII maze).
                 for (int j = 0; j < mazeColumns; j++)
                 {
-                    mazeGraph.AddNode(new MazeTile(i, j, inputRow[j]));
+                    KirkMaze.UpdateTile(i, j, inputRow[j]);
                 }
             }
 
-            // Write an action using Console.WriteLine()
-            // To debug: Console.Error.WriteLine("Debug messages...");
+            // deciding next move
+            if (alarmTriggered)
+            {
+                newMove = KirkMaze.DirectionToStart(currentPosition);
+            }
+            else if (KirkMaze.EscapePossible(alarmRounds))
+            {
+                newMove = KirkMaze.DirectionToControlRoom(currentPosition);
+            }
+            else
+            {
+                newMove = KirkMaze.DirectionToScout(currentPosition);
+            }
 
-            Console.WriteLine("RIGHT"); // Kirk's next move (UP DOWN LEFT or RIGHT).
+            // To debug: Console.Error.WriteLine("Debug messages...");
+            Console.WriteLine(newMove); // Kirk's next move (UP DOWN LEFT or RIGHT).
         }
     }
 }
 
-class MazeTile
+class KirkMaze
 {
-    public Position Position { get; private set; }
-    public char Content { get; set; }
+    private int rows;
+    private int columns;
+    private Graph<Position> mazeGraph;
+    private Dictionary<Position, char> tilesContent;
 
-    public MazeTile(int row, int collumn, char content)
+    public Position StartingPosition { get; private set; }
+    public Position ControlRoomPosition { get; private set; }
+
+    public KirkMaze(int newRows, int newColumns)
     {
-        Position = new Position(row, collumn);
-        Content = content;
+        rows = newRows;
+        columns = newColumns;
+
+        mazeGraph = new Graph<Position>();
+        tilesContent = new Dictionary<Position, char>();
+
+        StartingPosition = new Position(rows + 1, columns + 1);
+        ControlRoomPosition = new Position(rows + 1, columns + 1);
     }
 
-    public override bool Equals(Object obj)
+    public void UpdateTile(int row, int column, char content)
     {
-        if (obj == null || GetType() != obj.GetType()) return false;
-        MazeTile otherTile = (MazeTile)obj;
-        return Position.Row == other.Position.Row && Position.Collumn == other.Position.Collumn;
+        char tileContet;
+        Position newTilePosition = new Position(row, column);
+
+        // do we really need an update?
+        if (tilesContent.TryGetValue(newTilePosition, out tileContet))
+        {
+            if (tileContet == content)
+            {
+                return;
+            }
+        }
+        else
+        {
+            mazeGraph.AddNode(newTilePosition);
+        }
+
+        tilesContent[newTilePosition] = content;
+
+        bool passableTile = true;
+        switch (content)
+        {
+            case 'T':
+                StartingPosition = newTilePosition;
+                break;
+            case 'C':
+                ControlRoomPosition = newTilePosition;
+                break;
+            case '#':
+                passableTile = false;
+                break;
+        }
+
+        // update 4 posible adjusted positions
+        List<Position> tilesToUpdate = new List<Position>();
+        tilesToUpdate.Add(new Position(row, column - 1));
+        tilesToUpdate.Add(new Position(row - 1, column));
+        tilesToUpdate.Add(new Position(row, column + 1));
+        tilesToUpdate.Add(new Position(row + 1, column));
+
+        foreach (Position updateTilePosition in tilesToUpdate)
+        {
+            if (updateTilePosition.Collumn > this.columns || updateTilePosition.Collumn < 0
+                || updateTilePosition.Row > this.rows || updateTilePosition.Row < 0)
+            {
+                continue;
+            }
+
+            if (!tilesContent.TryGetValue(updateTilePosition, out tileContet))
+            {
+                continue;
+            }
+
+            if (!passableTile)
+            {
+                mazeGraph.RemoveUndirectedEdge(newTilePosition, updateTilePosition);
+            }
+            else if (tileContet != '#')
+            {
+                mazeGraph.AddUndirectedEdge(newTilePosition, updateTilePosition);
+            }
+        }
     }
 
-    public override int GetHashCode()
+    public bool EscapePossible(int alarmRounds)
     {
-        return Position.Row * 17 + Position.Collumn;
+        // A* from ControlRoomPosition to ControlRoomPosition
+        return false;
+    }
+
+    public string DirectionToStart(Position currentPosition)
+    {
+        // A* from currentPosition to StartingPosition
+        return "RIGHT";
+    }
+
+    public string DirectionToControlRoom(Position currentPosition)
+    {
+        // A* from currentPosition to ControlRoomPosition
+        // use result from EscapePossible() ??
+
+        return "RIGHT";
+    }
+
+    public string DirectionToScout(Position currentPosition)
+    {
+        // BFS till we get an unknown tile
+        GraphNode<Position> startNode = mazeGraph.Nodes.FindByValue(currentPosition);
+
+        Console.Error.WriteLine("BFS from: " + currentPosition);
+        Console.Error.WriteLine("ControlRoomPosition: " + ControlRoomPosition);
+
+        Dictionary<Position, Position> path = new Dictionary<Position, Position>();
+        Queue<GraphNode<Position>> nodeQueue = new Queue<GraphNode<Position>>();
+
+        GraphNode<Position> currentNode = null;
+        path.Add(currentPosition, currentPosition);
+        nodeQueue.Enqueue(startNode);
+        while (nodeQueue.Count > 0)
+        {
+            currentNode = nodeQueue.Dequeue();
+
+            if (tilesContent[currentNode.Value] == '?')
+            {
+                break;
+            }
+
+            foreach (GraphNode<Position> neighborNode in currentNode.NeighborsOut)
+            {
+                if (tilesContent[neighborNode.Value] == 'C')
+                {
+                    continue;
+                }
+
+                if (!path.ContainsKey(neighborNode.Value))
+                {
+                    path.Add(neighborNode.Value, currentNode.Value);
+                    nodeQueue.Enqueue(neighborNode);
+                }
+            }
+            currentNode = null;
+        }
+
+        if (currentNode == null)
+            return "PANIC";
+        else
+            return DirectionFromPath(path, currentPosition, currentNode.Value);
+    }
+
+    static string DirectionFromPath(Dictionary<Position, Position> path, Position startPosition, Position targetPosition)
+    {
+        Position currentPosition = targetPosition;
+        Position nextPosition = path[currentPosition];
+        while (nextPosition != startPosition)
+        {
+            currentPosition = nextPosition;
+            nextPosition = path[currentPosition];
+        }
+
+        int collumnDifference = startPosition.Collumn - currentPosition.Collumn;
+        int rowDifference = startPosition.Row - currentPosition.Row;
+        if (collumnDifference > 0)
+        {
+            return "LEFT";
+        }
+        else if (collumnDifference < 0)
+        {
+            return "RIGHT";
+        }
+        else if (rowDifference > 0)
+        {
+            return "UP";
+        }
+        else if (rowDifference < 0)
+        {
+            return "DOWN";
+        }
+        else
+        {
+            return "PANIC";
+        }
     }
 }
 
-struct Position
+struct Position : IEquatable<Position>
 {
     public int Row { get; set; }
     public int Collumn { get; set; }
 
     public Position(int row, int collumn)
     {
-        Row = collumn;
-        Collumn = row;
+        Row = row;
+        Collumn = collumn;
+    }
+
+    public bool Equals(Position other)
+    {
+        return Row == other.Row && Collumn == other.Collumn;
+    }
+
+    public override bool Equals(object other)
+    {
+        // https://stackoverflow.com/questions/1502451/what-needs-to-be-overridden-in-a-struct-to-ensure-equality-operates-properly
+        return other is Position && this == (Position)other;
+    }
+
+    public static bool operator ==(Position x, Position y)
+    {
+        return x.Row == y.Row && x.Collumn == y.Collumn;
+    }
+
+    public static bool operator !=(Position x, Position y)
+    {
+        return !(x == y);
+    }
+
+    public override int GetHashCode()
+    {
+        // https://stackoverflow.com/questions/263400/what-is-the-best-algorithm-for-an-overridden-system-object-gethashcode
+        unchecked
+        {
+            int hash = 17;
+            hash = hash * 23 + Row.GetHashCode();
+            hash = hash * 23 + Collumn.GetHashCode();
+            return hash;
+        }
+    }
+
+    public override string ToString()
+    {
+        return Row.ToString() + "; " + Collumn.ToString();
     }
 }
 
-public class Graph<T>
+class Graph<T>
 {
     public GraphNodeList<T> Nodes { get; private set; }
 
@@ -115,7 +335,7 @@ public class Graph<T>
     {
         GraphNode<T> nodeFrom = Nodes.FindByValue(from);
         GraphNode<T> nodeTo = Nodes.FindByValue(to);
-        if (nodeFrom != null & nodeTo != null)
+        if (nodeFrom != null && nodeTo != null)
             AddDirectedEdge(nodeFrom, nodeTo);
     }
 
@@ -129,7 +349,7 @@ public class Graph<T>
     {
         GraphNode<T> nodeFrom = Nodes.FindByValue(from);
         GraphNode<T> nodeTo = Nodes.FindByValue(to);
-        if (nodeFrom != null & nodeTo != null)
+        if (nodeFrom != null && nodeTo != null)
             AddUndirectedEdge(nodeFrom, nodeTo);
     }
 
@@ -145,7 +365,7 @@ public class Graph<T>
     {
         GraphNode<T> nodeFrom = Nodes.FindByValue(from);
         GraphNode<T> nodeTo = Nodes.FindByValue(to);
-        if (nodeFrom != null & nodeTo != null)
+        if (nodeFrom != null && nodeTo != null)
             RemoveDirectedEdge(nodeFrom, nodeTo);
     }
 
@@ -159,7 +379,7 @@ public class Graph<T>
     {
         GraphNode<T> nodeFrom = Nodes.FindByValue(from);
         GraphNode<T> nodeTo = Nodes.FindByValue(to);
-        if (nodeFrom != null & nodeTo != null)
+        if (nodeFrom != null && nodeTo != null)
             RemoveUndirectedEdge(nodeFrom, nodeTo);
     }
 
@@ -212,7 +432,7 @@ public class Graph<T>
 
 }
 
-public class GraphNode<T>
+class GraphNode<T>
 {
     public T Value { get; }
     public HashSet<GraphNode<T>> NeighborsOut { get; }
@@ -224,9 +444,19 @@ public class GraphNode<T>
         NeighborsOut = new HashSet<GraphNode<T>>();
         NeighborsIn = new HashSet<GraphNode<T>>();
     }
+
+    public override bool Equals(object other)
+    {
+        return other != null && Value.Equals(((GraphNode<T>)other).Value);
+    }
+
+    public override int GetHashCode()
+    {
+        return Value.GetHashCode();
+    }
 }
 
-public class GraphNodeList<T> : HashSet<GraphNode<T>>
+class GraphNodeList<T> : HashSet<GraphNode<T>>
 {
     private Dictionary<T, GraphNode<T>> valueNodeMap;
 
